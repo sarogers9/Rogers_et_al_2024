@@ -1,6 +1,11 @@
 # Rogers_et_al_2024
 Original data processing pipeline for all data (raw dF/F traces, TCA model outputs) presented in Rogers et al 2024. Wrapper, custom functions, and data files.
 
+## Table of contents
+- [Data](#data)
+- [Custom functions](#custom-functions)
+- [Code](#code)
+- [Data viz](#data-viz)
 ## Data
 Data types are .txt, .csv, .mat
 ### 1. Psilocybin TFC behavior
@@ -19,7 +24,7 @@ Data types are .txt, .csv, .mat
 * files named by treatment (Psil, Sal,or Nonshock) `totApool{treamtent}.csv'
 * output of section 1 the code, used in sections 13+
 * 1 second-summed dFoF in each 60 second trial in each session (rows) of each longitudinall registered cell (columns) in a treatment group. 
-### 5. TCA models used for ensemble analysis
+### 5. TCA models
 * files organized by treatment, named for mouse `td{animal number}.csv`
 * output of tensortools python kit and example TCA code written by [Williams et al. 2018](https://github.com/neurostatslab/tensortools)
 * columns are components for a model of rank 5. if t is number of time samples per trial, c is cell, and T is trials, first row is empty, and using Matlab indexing, rows 2:t+1 are temporal factor weights for each time, t+2:t+c+1 are neuron factor weights for each neuron, and t+c+2:t+c+T+1 are trial factor weights for each trial
