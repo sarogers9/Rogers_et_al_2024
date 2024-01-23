@@ -7,7 +7,8 @@ Original data processing pipeline for all data (raw dF/F traces, TCA model outpu
 - [Code](#code)
 - [Data viz](#data-viz)
 ## Data
-Data types are .txt, .csv, .mat. *DATA FILES TOO BIG TO SHARE HERE* please use [this google drive link](https://drive.google.com/drive/folders/166L46gJoap9pJ6yg_N84jDe-CzGDI6iD?usp=sharing
+Data types are .txt, .csv, .mat. 
+*DATA FILES TOO BIG TO SHARE HERE* please use [this google drive link](https://drive.google.com/drive/folders/166L46gJoap9pJ6yg_N84jDe-CzGDI6iD?usp=sharing
 ) to access until further notice. Same documentation applies. 
 ### 1. Psilocybin TFC behavior
 * data for figure 1 (no miniscope), files organized by cohort (.txt files)
