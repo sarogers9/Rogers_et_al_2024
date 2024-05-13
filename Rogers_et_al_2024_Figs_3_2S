@@ -1,0 +1,389 @@
+%% Rogers et al 2024 non-longitudinally registered data
+
+%Supp Fig 2 C-I
+
+%% 1. long register sessions with broken files
+
+dA{1,1} = rogers2024.animals(13).sessions(1).calcium;
+dA{2,1} = rogers2024.animals(13).sessions(2).calcium;
+[longRegistered]= crossSeshPair(table2array(rogers2024.animals(13).cellreg),dA,[0 1]);
+
+x = longRegistered{1,1};
+y=longRegistered{2,1};
+dt=20;
+new13hab = [x; x(end-16.8*dt/2+1:end,:); y(1:16.8*dt/2,:); y];
+
+rogers2024.animals(13).sessions(1).calcium = array2table(new13hab);
+rogers2024.animals(13).sessions(2).calcium = readtable('mm49acq.csv');
+rogers2024.animals(13).sessions(3).calcium = readtable('mm49ext1.csv');
+rogers2024.animals(13).sessions(4).calcium = readtable('mm49ext2.csv');
+rogers2024.animals(13).sessions(5).calcium = readtable('mm49ext3.csv');
+
+
+dA{1,1} = rogers2024.animals(12).sessions(3).calcium;
+dA{2,1} = rogers2024.animals(12).sessions(4).calcium;
+[longRegistered]= crossSeshPair(table2array(rogers2024.animals(12).cellreg),dA,[2 3]);
+
+new12ext1 = [longRegistered{1,1}; longRegistered{2,1}];
+
+rogers2024.animals(12).sessions(1).calcium = readtable('mm45hab.csv');
+rogers2024.animals(12).sessions(2).calcium = readtable('mm45acq.csv');
+rogers2024.animals(12).sessions(3).calcium = array2table(new12ext1);
+rogers2024.animals(12).sessions(4).calcium = readtable('mm45ext2.csv');
+rogers2024.animals(12).sessions(5).calcium = readtable('mm45ext3.csv');
+%% 2. Downsample data to 15Hz from 20Hz to match freezing data sampling rate
+
+nSesh = 5;
+nAnimals = 21;
+%loop through animals
+for n=1:nAnimals
+    %loop through sessions
+    for m=1:nSesh
+        a = table2array(rogers2024.animals(n).sessions(m).calcium);
+        a = a(:,2:end);
+        
+        dsA = zeros(round(length(a)/dt)-1,size(a,2));
+        
+        %take AUC over 1 second 
+        for t= 1:round(length(a)/dt)-1
+            dsA(t,:) =mean(a(1+(t-1)*dt:t*dt,:));  
+        end
+        %store downsampled data
+        dsData{n,m} = dsA;
+    end
+end
+
+%load task & trial parameters
+dt=20;
+bl = [1:10];
+stim = [1:25];
+trace = [26:45];
+shock = [46:50];
+stimuli = {stim, trace, shock};
+
+
+%% 3.  identify neurons significantly responsive to stimuli on single trials
+changedCells = cell(nSesh, length(stimuli)+1, 3, nAnimals); %5 sessions, number of stimuli, up down stable total, animal
+totCells = cell(nSesh, length(stimuli)+1, nAnimals);
+fractionChanged = zeros(5,4,4,21);
+
+for n=1:nAnimals
+    triCounter = 0;
+    tic
+    for m=1:nSesh
+        stim = round(rogers2024.animals(n).sessions(m).stimulusTimes);
+        triCounter = triCounter+length(stim);
+        dsA = dsData{n,m};
+        
+        for k=1:length(stimuli)
+            input1=[];
+            input2=[];
+            input3=[];
+            
+            for c=1:size(dsA,2)
+                data1=[];
+            data2=[];
+            data3=[];
+            for t=1:length(stim)
+                 if k==3
+                    blUse = [stim(t)+stimuli{k}(1)-bl-5];
+                    
+                 else
+                    blUse = [stim(t)-bl];
+                    
+                 end
+                 
+                 
+                 data1 = [data1; dsA([blUse stim(t)+stimuli{k}],c)'];
+                 if t<3
+                     data2 = [data2; dsA([blUse stim(t)+stimuli{k}],c)'];
+                 elseif t>length(stim)-2
+                     data3 = [data3; dsA([blUse stim(t)+stimuli{k}],c)'];
+                 end
+%                  sigcells = isSig(dsA,blUse,stim(t)+stimuli{k});
+%                  
+%                  responses{k,t,n} = sigcells{1};
+%                  fractions(k,t,n) = length(sigcells{1})/size(dsA,2);
+            end
+            data1 = mean(data1)';
+            data2 = mean(data2)';
+            data3 = mean(data3)';
+            input1 = [input1 data1];
+            input2 = [input2 data2];
+            input3 = [input3 data3];
+            end
+            sigcellsTot = isSig(input1,[1:10],[11:length(data1)]);
+            sigcellsEarly = isSig(input2,[1:10],[11:length(data1)]);
+            sigcellsLate = isSig(input3,[1:10],[11:length(data1)]);
+            responses{k,1,n} = sigcellsTot{1};
+            fractions(k,1,n) = length(sigcellsTot{1})/size(dsA,2);
+            responses{k,2,n} = sigcellsEarly{1};
+            fractions(k,2,n) = length(sigcellsEarly{1})/size(dsA,2);
+            responses{k,3,n} = sigcellsLate{1};
+            fractions(k,3,n) = length(sigcellsLate{1})/size(dsA,2);
+        end
+        
+        for t=1:3%length(stim)
+            sCells = responses{1,t,n};
+            tCells = responses{2,t,n};
+            responses{4,t,n} = sCells(ismember(sCells,tCells));
+            responses{1,t,n} = sCells(~ismember(sCells,tCells));
+            responses{2,t,n} = tCells(~ismember(tCells,sCells));
+        end
+        
+        for k=1:length(stimuli)+1
+            for t=1:length(stim)
+                totCells{m,k,n} = [totCells{m,k,n} responses{k,t,n}];
+            end
+            totCells{m,k,n}=unique(totCells{m,k,n});
+        end
+        
+        
+        for k=1:length(stimuli)+1
+            cellpop = totCells{m,k,n};
+            for c = 1:length(cellpop)
+                
+                ind = [0 0];
+                if sum(ismember(cellpop(c),responses{k,1,n})) > 0 %ismember(cellpop(c),responses{k,2,n})
+                    ind(1) = 1;
+                end
+                if sum(ismember(cellpop(c),responses{k,2,n}))  > 0 %[responses{k,length(stim)-1,n} responses{k,length(stim),n}]
+                    ind(2) = 1;
+                end
+                if sum(ind) == 2
+                    changedCells{m,k,3,n} = [changedCells{m,k,3,n} cellpop(c)];
+                elseif sum(ind) == 1 & ind(1) == 1
+                    changedCells{m,k,1,n} = [changedCells{m,k,1,n} cellpop(c)];
+                elseif sum(ind) == 1 & ind(2) == 1
+                    changedCells{m,k,2,n} = [changedCells{m,k,2,n} cellpop(c)];
+                end
+            end
+        end
+        
+        for k=1:length(stimuli)+1
+            totResCells = length(changedCells{m,k,1,n})+ length(changedCells{m,k,2,n})+length(changedCells{m,k,3,n});
+            fractionChanged(m,k,1,n) = length(totCells{m,k,n})./size(dsA,2);
+            fractionChanged(m,k,2,n) = length(changedCells{m,k,1,n})./totResCells;
+            fractionChanged(m,k,3,n) = length(changedCells{m,k,2,n})./totResCells;
+            fractionChanged(m,k,4,n) = length(changedCells{m,k,3,n})./totResCells;
+        end
+    end
+   toc
+triCounter = triCounter + length(stim);
+fracsPerTrial{m} = fractions;
+end
+%% 4. calculate total freezing in first and last half of session per mouse
+halves = [1 2; 3 4; 5 6; 7 8; 9 10];
+for n=1:21
+    for m=1:5
+    freezing = table2array(rogers2024.animals(n).sessions(m).freezing);
+    stim = round(rogers2024.animals(n).sessions(m).stimulusTimes-30).*15;
+    meanFreeze(halves(m,1),n) = mean(freezing(1:stim(length(stim)/2)+60*15));
+    meanFreeze(halves(m,2),n) = mean(freezing(stim(length(stim)/2)+60*15+1:stim(end)+60*15));
+    meanFreezeAll(m,n) = mean(freezing(1:stim(end)+60*15));
+    end
+end
+%% 5. calculate correlation of rec, sup, stable, and total fraction of stim responsive cells to freezing
+saline  = [1:7];
+psilocybin = [8:21];
+
+%insert group of interest here - psil or sal
+group=[psilocybin];
+clear r p
+for m=1:nSesh*2
+    for n=1:5
+    y  = meanFreeze(m,group)';
+    y(isnan(y)) =0;
+    
+    for  k =1:(length(stimuli)+1)
+        for s = 1:4
+                x = squeeze(fractionChanged(n,k,s,group));
+       x(isnan(x)) =0;
+        [r(m,n,k,s),p(m,n,k,s)] =corr(x,y);
+        
+%         if p(m,n,k)<0.05
+%             figure
+%             scatter(x,y)
+%             title(['Session ',num2str(sessions(m)),' part ' num2str(2-mod(m,2)) ' freezing, session ',num2str(n), ' activity, stimulus ',num2str(k),', r = ' num2str(r(m,n,k)), ' p = ', num2str(p(m,n,k))])
+%             lsline
+%         end
+        end
+    end
+    end
+end
+
+r(p>0.05)=0;
+
+labels = {'Hab','Acq','Ext1','Ext2','Ext3'};
+stimulis = {'Tone','Trace','Shock','Stim+Trace'};
+figure
+for n=1:5
+    for k=1:4
+    subplot(5,4,(n-1)*4+k)
+    heatmap(squeeze(r(:,n,k,:)),'colorlimits',[-1 1])
+    xlabel(stimulis{k})
+    ylabel('Mean freezing')
+    colormap(jet)
+    title({labels{n}})
+    end
+end
+
+%% 6. normalize data
+start = 20;
+fin=20;
+len = start+fin;
+for m=1:5
+    tic
+    for n=1:21
+        data = table2array(rogers2024.animals(n).sessions(m).calcium);
+        data=data(:,2:end);
+        data(isnan(data)) = 0;
+        data= resample(data,3,4);
+        dsData{m,n} = data./max(data);
+    end
+end
+
+%% 7. calculate projection trajectories for going from motion --> freezing and freezing --> motion; euclidean distance between them at each timepoint; dPrime of individual neurons; and plot 
+start = 15*2;
+fin = 15*2;
+len = start+fin;
+dt=15;
+for m=1:5
+    tic
+    for n=1:21
+        data = table2array(rogers2024.animals(n).sessions(m).calcium);
+        data = data(:,2:end);
+        data(isnan(data)) = 0;
+        data=resample(data,3,4);
+        data = data./max(data);
+        c = rogers2024.animals(n).sessions(m).stimulusTimes(1);
+        offset = (c-120).*dt;
+        data = data(c+1:end,:);
+        
+        behav =table2array(rogers2024.animals(n).sessions(m).freezing);
+        behav(behav==100)=1;
+        
+        freezOn = strfind(behav',[0 1]);
+        freezOff = strfind(behav',[1 0]);
+        boutlengths = 0;
+        freezeBouts(n,m) = length(freezOn);
+        for j=1:length(freezOn)-1
+            ind = freezOn(j);
+            inds = freezOff(freezOff>ind);
+            boutend = inds(1);
+            boutlength(j,1) = boutend-ind;
+        end
+        totFreeze(n,m) = sum(behav);
+        meanboutlengths(n,m) = median(boutlength);
+        
+        ds=zeros(size(data,2),1);
+        
+        nmat = [];
+        fmat = [];
+        nmat2 = [];
+        fmat2 = [];
+        
+        for c= 1:size(data,2)
+            onMat = zeros(1,len);
+            for t=1:length(freezOn)
+                if freezOn(t)>=start & freezOn(t)+fin <= length(data)
+                onMat(t,:) = data(freezOn(t)-start+1:freezOn(t)+fin,c)';
+                end
+            end
+
+            offMat = zeros(1,len);
+            for t=1:length(freezOff)
+                if freezOff(t)>=start & freezOff(t)+fin <= length(data)
+                offMat(t,:) = data(freezOff(t)-start+1:freezOff(t)+fin,c)';
+                end
+            end
+            
+            ds(c,1) = [mean(onMat(:,30:end),'all') +  mean(offMat(:,1:29),'all') - mean(onMat(:,1:29),'all') - mean(offMat(:,30:end),'all')]./[mean(onMat(:,30:end),'all') +  mean(offMat(:,1:29),'all') + mean(onMat(:,1:29),'all') + mean(offMat(:,30:end),'all')];
+
+            nmat = [nmat mean(onMat)'];
+            fmat = [fmat mean(offMat)'];
+        end
+        
+        time = size(nmat2,1);
+        trials(1) = size(nmat2,2);
+        cells = size(nmat2,3);
+        
+        trials(2) = size(fmat2,2);
+        
+%         if trials(1) > trials(2)
+%             nmat2 = nmat2(:,1:trials(2),:);
+%         elseif trials(1) < trials(2)
+%             fmat2 = fmat2(:,1:trials(1),:);
+%         end
+%         
+%         trials = size(nmat2,2);
+        
+        
+       [c,s] = pca([nmat; fmat]);
+       
+       projections = zeros(len,3,2);
+       projections(:,:,1) = s(1:len,1:3);
+       projections(:,:,2) = s(len+1:len*2,1:3);
+       
+       projectionsF(:,:,:,n,m) = projections;
+       
+       projectionsM = squeeze(mean(projections,3));
+       projectionsSEM = squeeze(std(projections,[],3));
+ 
+        for t=1:len
+           ditMean(n,t,m)= sqrt(sum((projections(t,1:3,1)-projections(t,1:3,2)).^2));
+        end
+        
+        dPrime(n,m) = median(abs(ds));
+        dPrimeF(n,m) = mean(ds>mean(ds)+std(ds));
+        dPrimeM(n,m) = mean(ds<mean(ds)-std(ds));
+    end
+    toc
+end
+
+%plot dprime
+figure
+for n=1:4
+    subplot(1,4,n)
+    barWithError(dPrime(rogers2024.groups(n).members,:))
+    ylim([0 .04])
+end
+
+%plot projections for a specific animal and session - here is data plotted
+%in fig. 3C
+an=2;
+sess = 3;
+figure;
+plot3(projectionsF(1:60,1,1,an,sess),projectionsF(1:60,2,1,an,sess),projectionsF(1:60,3,1,an,sess),'b','Linewidth',3)
+hold on
+plot3(projectionsF(:,1,2,an,sess),projectionsF(:,2,2,an,sess),projectionsF(:,3,2,an,sess),'r','Linewidth',3)
+hold on
+scatter3(projectionsF(30,1,1,an,sess),projectionsF(30,2,1,an,sess),projectionsF(30,3,1,an,sess),200,'b','filled')
+hold on
+scatter3(projectionsF(30,1,2,an,sess),projectionsF(30,2,2,an,sess),projectionsF(30,3,2,an,sess),200,'r','filled')
+hold on
+scatter3(projectionsF(1,1,[1 2],an,sess),projectionsF(1,2,[1 2],an,sess),projectionsF(1,3,[1 2],an,sess),200,'k','filled')
+grid on
+
+% plot distance across 4sec window
+colors = {'g','k','c','r'};
+titles= {'Hab','Acq','Ext1','Ext2','Ext3'};
+figure
+for m=1:5
+subplot(1,5,m)
+for n=1:4
+plot(mean(ditMean(rogers2024.groups(n).members,:,m)+std(ditMean(rogers2024.groups(n).members,:,m)./length(rogers2024.groups(n).members))),colors{n})
+hold on
+plot(mean(ditMean(rogers2024.groups(n).members,:,m)-std(ditMean(rogers2024.groups(n).members,:,m)./length(rogers2024.groups(n).members))),colors{n})
+hold on
+plot(mean(ditMean(rogers2024.groups(n).members,:,m)),colors{n},'Linewidth',3)
+hold on
+xline(31)
+end
+%ylim([0 .3])
+title(titles{m})
+if m==1
+    ylabel('Distance in first 3 PCs')
+end
+end
+
