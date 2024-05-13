@@ -7,9 +7,9 @@ Original data processing pipeline for all data (raw dF/F traces, TCA model outpu
 - [Code](#code)
 - [Data viz](#data-viz)
 ## Data
-Data types are .txt, .csv, .mat. 
-*DATA FILES TOO BIG TO SHARE HERE* please use [this google drive link](https://drive.google.com/drive/folders/166L46gJoap9pJ6yg_N84jDe-CzGDI6iD?usp=sharing
-) to access until further notice. Same documentation applies. 
+Data types are .txt, .csv, .mat. The data structure rogers2024.mat contains all datasets, group, and task/trial information. Load into the beginning of all subsequent code.
+*ORIGINAl DATA FILES TOO BIG TO SHARE HERE* To recreate the data structure please use [this google drive link](https://drive.google.com/drive/folders/166L46gJoap9pJ6yg_N84jDe-CzGDI6iD?usp=sharing
+) and request permissions from author to access until further notice, run the code storeRogers2024Data.m. Same documentation applies. 
 ### 1. Psilocybin TFC behavior
 * data for figure 1 (no miniscope), files organized by cohort (.txt files)
 * percent time freezing for each animal in each session (hab, acq, ext1, ext2, ext3) `R{round number}B{box number}{session}.csv`
@@ -35,10 +35,6 @@ Data types are .txt, .csv, .mat.
 * fake tensor of 1 simulated neuron, with identical within and across trial structure as real data. `placeboMat2.mat`
 * average neuron factor weights from 100 iterations of TCA on the placebo tensor for x neurons, where x is the number of neurons for each animal, yielding a null hypothesis threshold for each animal. animals (rows) 1-14 are psilocybin, 15-21 are saline. `fMeans.csv`
 * created in TCA code written by [Williams et al. 2018](https://github.com/neurostatslab/tensortools)
-### 7. Indices of cells for each ensemble
-* files organized by treatment group
-* list of all cells from group with neuron factor weights that exceed threshold = 1 in all session-dominant component indicated in title. `{sessions in which dominant}{abbreviated group}.txt`
-* created in Code section 12 used in sections 13+
   
 ## Custom functions
 Written by Sophie A. Rogers, Corder Laboratory, University of Pennsylvania
@@ -99,6 +95,48 @@ this function makes bar graphs with SEM error bars
 * mu - mean
 * sem - standard error
 * bar plot
+### permTest
+this function tests if means are different such that p<0.05 compared to shuffled data. 
+#### inputs
+* traces - data matrix, with variables to plot in columns and observations/replicates in rows
+* baselineTime - array with null hypothesis start and end time
+* targetTime - array with target start and end time
+* numIt - number of iterations
+#### outputs
+* changedCells - size 3x1 cell with significantly {1} upregulated, {2} downregulated, {3} nonresponsive cell indices
+### plotPersist
+this function plots fractions of cells by animal
+#### inputs
+* dat - 3-4D data matrix of size: animals x sessions or trials x stimuli x response direction.
+* groups - cell of size: number of groups x 1 size cell with animal IDs in each cell
+* groupNames - cell with group names
+* conditions - array or cell of size length of response direction x 1
+* labels - cell of size stimuli x 1
+#### outputs
+* figure with subplots of animal groups in columns, stimuli in rows, and response directions in lines
+### plot2metrics
+this function plots bar graphs with SEM error bars over time of 2 different data sets
+#### inputs
+* data1 - data to be plotted in row 1, variables in columns and replicates in rows
+* data2 - data to be plotted in row 2, variables in columns and replicates in rows
+* titles - cell of x tick labels
+* groupNames - names of groups
+* groupMembers - cell of size: number of groups x 1 size cell with animal IDs in each cell
+* ylab1 - ylabel for row 1
+* ylab2 - ylabel for row 2
+* ylim1 - y axis limits for row 1
+* ylim2 - y axis limits for row 2
+#### outputs
+figure with subplots of animal groups in columns, data types in rows
+### plotTCAmodel
+this function creates TCA model plots with temporal, neural, and trial factor subplots in columns and component subplots in rows
+#### inputs
+* timeFactor - matrix of time factor weights for each component for each component in columns at each time in rows
+* neuronFactor - matrix of neuron factor weights for each component for each component in columns at each cell in rows
+* trialFactor - matrix of trial factor weights for each component for each component in columns at each trial in rows
+* colorCode - array of length trials with containing the variable for desired color code
+#### outputs
+Figure of TCA model
 
 ## In Vivo Imaging Analysis Pipeline for Rogers et al., 2024
 Each part depends on previous parts and will not run without one another unless specified. Custom function and data folders must be downloaded and added to path. In the following sections you will:
