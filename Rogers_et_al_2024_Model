@@ -1,0 +1,325 @@
+%% Circuit model for RSC Acquisition dominant and Extinction 3 dominant ensembles
+
+%initialize activity arrays
+acqDom = ones(1,10);
+ext3Dom = ones(1,10);
+
+%initialize synaptic weights
+wacqDom = .01*ones(10); %recurrent
+wext3Dom = .01*ones(10); %recurrent
+wa3Dom = .5*ones(10);  %between units of opposite ensembles
+
+%assign increments of inhibition for each psilocybin condition
+acuteInh = linspace(0,1,100);
+
+%initialize inhibition from opposite ensembles
+a_e3DomMat = -.1.*ones(10);
+e3_aDomMat = -.1.*ones(10);
+
+%trial structure
+trials = 34;
+trialLength = 120;
+toneTimes = 11:35;
+traceTimes = 36:55;
+shockTimes = 56:58;
+
+%task structure with binary (time x tone,trace) and continuous (time x shock/omission) stimulus vector 
+stimDeliv = zeros(trials*trialLength,3);
+for t=1:trials %
+stimDeliv(toneTimes+(trialLength*t-1),1) = 1; %deliver tone on each trial at 11-35 seconds
+stimDeliv(traceTimes+(trialLength*t-1),2) = 1; %deliver trace on each trial at 36-55 seconds
+end
+for t=9:16
+stimDeliv(shockTimes+(trialLength*t-1),3) = 1; %deliver shock at each acquisition trial (9:16) at 56:58 seconds
+end
+for t=17:22
+stimDeliv(shockTimes+(trialLength*t-1),3) = -1; %flip sign on extinction trials to simulate shock omission
+end
+for t=23:34
+stimDeliv(shockTimes+(trialLength*t-1),3) = -1+(t-22)/12; %in last session, salience of shock omission decreases linearly
+end
+
+
+%weight of each type of stim to each neuron
+stimWA = zeros(10,3);
+stimW3= zeros(10,3);
+
+%acq units
+stimWA(1:8,3) = 1; %eight shock responsive
+ stimWA(7:9,2) = .1; %three trace responsive
+ stimWA(9:10,1) = .1; %two tone responsive
+% 
+stimW3(1:5,3) =-1; %five shock omission responsive
+stimW3(4:7,2) = .1; %four trace responsive
+stimW3(8:10,1) = .1; %three tone responsive
+
+%time constant 1ms
+tau=.001;
+%nonlinear threshold
+r= 3;
+
+%final condition is to ablate acq dom input
+acuteInh(101) = 0;
+
+for bigConds = 1%:8 %loop through all model architectures. 1 is the full model
+    if bigConds == 2
+         stimW3(1:5,3) =0; %in second model, knock out shock omission tuning
+    end
+        
+    for conds = 1:101 %loop through psilocybin inhibition "doses"
+        %initialize activities
+        acqDom = .1*ones(1,10);
+        ext3Dom = .1*ones(1,10);
+        
+        %initialize psilocybin dose to be delivered during extinction 1
+        psil = zeros(trials*trialLength,1);
+        psil(trialLength*16+1:trialLength*22,1) = acuteInh(conds);
+        
+        %initialize synaptic input and weight vectors
+        dA = zeros(1,10);
+        d3 = zeros(1,10);
+        wA = wacqDom;
+        w3 = wext3Dom;
+        
+        %iterate model over time
+        for t = 2:trials*trialLength
+
+
+            for n=1:10
+                %synaptic inputs from opposite ensembles
+                inputA3 = mean(ext3Dom(t-1,:).*sum(a_e3DomMat(:,n)))*2;
+                input3A = mean(acqDom(t-1,:).*sum(a_e3DomMat(:,n)))*2;
+
+                if bigConds == 3 %in model 3 knock down inhibition from acq to ext3
+                    inputA3 = 0;
+                    input3A = mean(acqDom(t-1,:).*sum(a_e3DomMat(:,n)))*2;
+                elseif bigConds == 4 %in model 4 knock down inhibition from ext3 to acq
+                    inputA3 = mean(ext3Dom(t-1,:).*sum(a_e3DomMat(:,n)))*2;
+                    input3A = 0;
+                elseif bigConds == 5 %in model 5 knock down mutual inhibition
+                    inputA3 = 0;
+                    input3A = 0;
+                elseif bigConds == 6 %in model 6 knock down recurrent acq weights
+                    wA= zeros(10);
+                elseif bigConds == 7 %in model 7 knock down recurrent ext3 weights
+                    w3= zeros(10);
+                elseif bigConds == 8 %in model 8 knock down recurrent weights
+                    w3= zeros(10);
+                    wA= zeros(10);
+                end
+                
+                %calculate each unit's input from stimulus
+                stimPutA(n,1) = sum(stimDeliv(t-1,:).*stimWA(n,:));
+                stimPut3(n,1) = sum(stimDeliv(t-1,:).*stimW3(n,:));
+
+                %synaptic input to acq dom
+                dA(1,n) = (stimPutA(n) + inputA3 + acqDom(t-1,n).*sum(wA(n,:))  - dA(n)).*tau -psil(t-1)*tau;
+                
+                %ablate during extinction 1 if condition is 101
+                if conds == 101 
+                    if t>trialLength*16 & t<trialLength*22+1
+                    dA(1,n) = 0;
+                    end
+                end
+                
+                %synaptic input to ext3 dom
+                d3(1,n) = (stimPut3(n) +ext3Dom(t-1,n).*sum(w3(n,:)) + input3A - d3(n)).*tau; %
+            end
+
+            inputs = {dA, d3};
+
+            %calculate nonlinear contribution of inputs to firing rate
+            for i = 1:2
+                neurons = inputs{i};
+                for n=1:length(neurons)
+                    if neurons(n)<=0
+                        neurons(n) = 0;
+                    elseif neurons(n)<1/r
+                        neurons(n)= r.*neurons(n);
+                    else
+                        neurons(n) = 1;
+                    end
+                end
+                inputs{i} = neurons;
+            end
+
+            %calculate change in activity
+            acqDom(t,:) = acqDom(t-1,:) + inputs{1} - acqDom(t-1,:)*tau;
+            ext3Dom(t,:) = ext3Dom(t-1,:) + inputs{2}-ext3Dom(t-1,:)*tau;
+            
+            %update synaptic weights by alpha = .1 if neurons are
+            %simultaneously active during stimulus
+            for n=1:10
+                for m=1:10
+                if stimPutA(n,1)>0 & acqDom(t,n)>.01 & acqDom(t,m)>.01
+                    wA(n,m) = wA(n,m)+.1*wA(n,m)*([acqDom(t,n)+acqDom(t,m)]);
+                end
+                if stimPut3(n,1)>0 & ext3Dom(t,n)>.01 & ext3Dom(t,m)>.01
+                    w3(n,m) = w3(n,m)+ (.1)*w3(n,m)*([ext3Dom(t,n)+ext3Dom(t,m)]);
+                end
+                end
+            end
+        
+            %normalize synaptic weights
+            wA = wA./max(wA,[],'all');
+            wA = wA./10;
+            w3 = w3./max(w3,[],'all');
+            w3 = w3./10;
+
+
+        end
+        
+        %store zscore activity
+        zA(:,:,conds,bigConds,1) = (acqDom-mean(acqDom(trialLength*8+1:trialLength*16,:)))./std(acqDom(trialLength*8+1:trialLength*16,:));
+        zA(:,:,conds,bigConds,2) = (ext3Dom-mean(ext3Dom(trialLength*8+1:trialLength*16,:)))./std(ext3Dom(trialLength*8+1:trialLength*16,:));
+        
+        %store raw activity
+        activityConds(:,:,conds,bigConds,1) = acqDom;
+        activityConds(:,:,conds,bigConds,2) = ext3Dom;
+        
+        %store synaptic weights
+        wSave{conds,bigConds,1} = wA;
+        wSave{conds,bigConds,2} = w3;
+    end
+end
+%% plot zscore over task across "doses" in one Big Condition
+figure
+subplot(121)
+plot(squeeze(mean(zA(:,:,:,1,1),2)))
+title('Acq-Dom Neurons')
+xlabel('Time (seconds)')
+ylabel('z-score with respect to Acq')
+hold on
+xline(trialLength*8)
+hold on
+xline(trialLength*16)
+hold on
+xline(trialLength*22)
+hold on
+xline(trialLength*28)
+subplot(122)
+plot(squeeze(mean(zA(:,:,:,1,2),2)))
+title('Ext3-Dom Neurons')
+xlabel('Time (seconds)')
+hold on
+xline(trialLength*8)
+hold on
+xline(trialLength*16)
+hold on
+xline(trialLength*22)
+hold on
+xline(trialLength*28)
+
+%% plot z-score from acq of acq-dom in ext1 and ext3-dom in ext3
+for m=1:8
+figure
+subplot(121)
+bar(squeeze(mean(mean(zA(trialLength*16+1:trialLength*22,:,:,m,1),1),2)))
+title('Acq-Dom Neurons during Ext1')
+ylabel('Mean z-score with respect to Acq')
+xlabel('Conditions')
+xticklabels({'Control','','Increasing doses of psil','','Acq-Dom input = 0 '})
+subplot(122)
+bar(squeeze(mean(mean(zA(trialLength*28+1:end,:,:,m,2),1),2)))
+title('Ext3-Dom Neurons during Ext3')
+ylabel('Mean z-score with respect to Acq')
+xlabel('Conditions')
+xticklabels({'Control','','Increasing doses of psil','','Acq-Dom input = 0 '})
+%ylim([1.5, 2])
+end
+
+%% plot relationship between z-score of acq dom in ext1 and z-score of ext3-dom in ext3
+figure
+for d=1:8
+    subplot(1,3,d-5)
+    scatter(squeeze(mean(mean(zA(trialLength*16+1:trialLength*22,:,1:100,d,1),1),2)),squeeze(mean(mean(zA(trialLength*28+1:end,:,1:100,d,2),1),2)))
+    title('Suppression of Acq-Dom neurons is proportional to later enhancement in Ext3-Dom neurons')
+    xlabel('Mean z-score Acq-Dom Neurons during Ext1') 
+    ylabel('Mean z-score Ext3-Dom Neurons during Ext3')
+end
+%legend({'Psil doses','Least Squares Line','Control','Ablate Acq input'})
+
+%% plot raw activities at no, low, high doses and ablated conditions
+for d=1:8
+toPlot = [1 2 100 101];
+titles = {'Full model', 'Low psilocybin', 'High psilocybin', 'Ablate input to Acq-dominant neurons'};
+figure
+for n=1:4
+subplot(1,4,n)
+plot(mean(activityConds(:,:,toPlot(n),d,1),2),'r')
+xlabel('Time (seconds)')
+if n==1
+ylabel('Firing rate')
+end
+hold on
+plot(mean(activityConds(:,:,toPlot(n),d,2),2),'b')
+hold on
+xline(trialLength*8)
+hold on
+xline(trialLength*16)
+hold on
+xline(trialLength*22)
+hold on
+xline(trialLength*28)
+title(titles{n})
+end
+end
+
+%% plot synaptic weights
+
+toPlot = [1 2 100 101];
+for d=1:6
+figure
+for n=1:4
+subplot(2,2,n)
+heatmap(wSave{toPlot(n),d,2})
+end
+end
+%% calculate MSE from real data
+p=zeros(length(m),2,5);
+for d = 1%:5%:6
+    
+    %REAL DATA CALCULATED IN MAIN ANALYSIS CODE
+m=[-0.206	1.2668
+-0.1801	1.6638
+-0.57	1.9634
+-0.4418	2.3733
+-1.7691	1.0359
+-0.4261	2.4588
+-0.7883	1.6265
+-0.353	0.4147
+-0.3205	0.8777
+-0.3358	1.2256
+-0.202	0.2221
+0.6659	1.1633
+-0.3621	2.179
+-0.9598	1.1979];
+ 
+m=[-0.4928	1.6723
+-1.1448	1.2258
+1.8185	2.9722
+0.1599	1.1175
+-0.0956	0.029
+0.9903	0.4729
+0.066	0.2561];
+
+data = [squeeze(mean(mean(zA(trialLength*16+1:trialLength*22,:,1:100,d,1),1),2)) squeeze(mean(mean(zA(trialLength*28+1:end,:,1:100,d,2),1),2))]; 
+
+
+shallowPart = data([1 5],:);
+deepPart = data([50 100],:);
+
+slopeShallow = [shallowPart(2,2)-shallowPart(1,2)]/[shallowPart(2,1)-shallowPart(1,1)];
+slopeDeep = [deepPart(2,2)-deepPart(1,2)]/[deepPart(2,1)-deepPart(1,1)];
+
+slopes = [slopeShallow slopeDeep];
+
+
+for s=1:length(slopes)
+    slope = slopes(s);
+    for n=1:length(m)
+        p(n,s,d) = (m(n,2)-m(n,1)*slope)^2;
+    end
+end
+
+end
