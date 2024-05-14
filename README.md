@@ -165,6 +165,9 @@ Each part depends on previous parts and will not run without one another unless 
 #### 15. Plot example traces from specific ensembles.
 #### 16. Plot average dFoF of non-intersecting Acq-dominant and Ext1/3-dominant ensembles and their ratios over seconds, trials
 
+## Linear Non-linear Firing Rate Model for Rogers et al., 2024 Fig. 8
+The model is described fully in the Methods section of the paper and every variable defined in code comments. This model performs the whole TFC acquisition and extinction task, looping through 8 different possible circuit architectures (bigCond == 1 being the concluded upon architecture) and 100 different "doses" of psilocybin inhibition and allows the units to learn the task over training. Outputs are the raw unit activities over the whole task, z-score with respect to acq of acq-dom units during Ext1 and ext3-dom units during Ext3, and the mean squared error of the real data with respect to these outputs.
+
 ## Data viz
 For aesthetic purposes and ease of organizing statistical comparisons, most data was exported from these sections in csv or txt files in imported into Prism. In this file are all data figures and associated statistical tests
 
