@@ -139,7 +139,7 @@ this function creates TCA model plots with temporal, neural, and trial factor su
 Figure of TCA model
 
 ## In Vivo Imaging Analysis Pipeline for Rogers et al., 2024, Longitudinal Analysis Pipeline 
-Each part depends on previous parts and will not run without one another unless specified. Custom function and data folders must be downloaded and added to path. For the analysis in Fig. 3 and Supp. Fig. 2, please see the fil Rogers_et_al_2024_Figs_3_2S.m. In the following sections you will:
+Each part depends on previous parts and will not run without one another unless specified. Custom function and data folders must be downloaded and added to path. For the analysis in Fig. 3 and Supp. Fig. 2, please see the file `Rogers_et_al_2024_Figs_3_2S.m` In the following sections you will:
 ### 1. Load the data of all animals in a given experimental group
 * Data: Behavior, dFoF, Cell pooled, session concatenated activity matrices
 ### 2. Extract the traces of longitudinally registered cells from all files, align to user-defined stimulus times or times of interest
