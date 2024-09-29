@@ -8,8 +8,7 @@ Original data processing pipeline for all data (raw dF/F traces, TCA model outpu
 - [Data viz](#data-viz)
 ## Data
 Data types are .txt, .csv, .mat. The data structure rogers2024.mat contains all datasets, group, and task/trial information. Load into the beginning of all subsequent code.
-*ORIGINAl DATA FILES TOO BIG TO SHARE HERE* To recreate the data structure please use [this google drive link](https://drive.google.com/drive/folders/166L46gJoap9pJ6yg_N84jDe-CzGDI6iD?usp=sharing
-) and request permissions from author to access until further notice, run the code storeRogers2024Data.m. Same documentation applies. 
+*ORIGINAl DATA FILES TOO BIG TO SHARE HERE* To download the data structure please use [this google drive link](https://drive.google.com/drive/folders/1naMBzlREXzaXH6uyjMA6XUr7c9STwVQ5?usp=sharing) and request permissions from author to access until further notice. Same documentation applies. 
 ### 1. Psilocybin TFC behavior
 * data for figure 1 (no miniscope), files organized by cohort (.txt files)
 * percent time freezing for each animal in each session (hab, acq, ext1, ext2, ext3) `R{round number}B{box number}{session}.csv`
